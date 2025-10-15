@@ -61,6 +61,8 @@ class DjangoDirectoryApiConfig(AppConfig):
 
         # Auto-discover and register routers from all installed apps
         registered_count = 0
+        registered_apps = []  # Track which apps contributed routers
+
         for app_config in apps.get_app_configs():
             # Skip django_directory_api itself to avoid circular import
             if app_config.name == self.name:
@@ -70,11 +72,13 @@ class DjangoDirectoryApiConfig(AppConfig):
                 # Try to import api.py from each app
                 api_module = import_module(f"{app_config.name}.api")
 
+                app_router_count = 0
+
                 # Register single router if it exists
                 if hasattr(api_module, "router"):
                     router = api_module.router
                     api_instance.add_router("", router)
-                    registered_count += 1
+                    app_router_count += 1
 
                 # Support multiple routers
                 if hasattr(api_module, "routers"):
@@ -82,7 +86,12 @@ class DjangoDirectoryApiConfig(AppConfig):
                     if isinstance(routers, (list, tuple)):
                         for router in routers:
                             api_instance.add_router("", router)
-                            registered_count += 1
+                            app_router_count += 1
+
+                # Track this app if it contributed routers
+                if app_router_count > 0:
+                    registered_count += app_router_count
+                    registered_apps.append(app_config.name)
 
             except (ImportError, AttributeError):
                 # App doesn't have api.py or router - that's ok, skip silently
@@ -93,4 +102,8 @@ class DjangoDirectoryApiConfig(AppConfig):
 
         # Optional: Log discovery results in debug mode
         if apps.is_installed("django.contrib.admin"):  # Proxy for debug mode check
-            print(f"[django-directory-api] Auto-discovered and registered {registered_count} API routers")
+            if registered_apps:
+                apps_list = ", ".join(registered_apps)
+                print(f"[django-directory-api] Auto-discovered and registered {registered_count} API routers from: {apps_list}")
+            else:
+                print("[django-directory-api] No API routers discovered")
