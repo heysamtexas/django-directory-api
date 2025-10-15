@@ -451,6 +451,116 @@ The package provides:
 2. **APIKeyAuth** - Bearer token authentication handler
 3. **Auto-Discovery System** - Scans apps for `api.py` files at startup
 4. **Common Schemas** - Shared Pydantic schemas (e.g., PaginatedResponse)
+5. **Django System Checks** - Validates configuration at startup
+6. **Management Command** - `api_discover` for debugging and validation
+
+## Troubleshooting
+
+### Discovery and Validation Commands
+
+List all discovered API routers:
+```bash
+python manage.py api_discover --list-routers
+```
+
+Show all registered endpoints:
+```bash
+python manage.py api_discover --list-endpoints
+```
+
+Validate api.py files for common issues:
+```bash
+python manage.py api_discover --validate
+```
+
+Run Django system checks:
+```bash
+python manage.py check
+```
+
+### Common Issues
+
+#### "My endpoints aren't showing up!"
+
+**Problem**: Created `api.py` but endpoints don't appear in `/api/docs`
+
+**Solutions**:
+
+1. **Check INSTALLED_APPS ordering**:
+   ```python
+   INSTALLED_APPS = [
+       # ...
+       "django_directory_api",  # Must come BEFORE your app
+       "myapp",  # Your app with api.py
+       # ...
+   ]
+   ```
+
+2. **Verify router export**:
+   ```python
+   # myapp/api.py
+   from ninja import Router
+
+   router = Router(tags=["My App"])  # ← Must be named 'router'
+
+   @router.get("/items/")
+   def list_items(request):
+       return {"items": []}
+   ```
+
+3. **Check for syntax errors**:
+   ```bash
+   python manage.py api_discover --validate
+   ```
+
+4. **Restart Django server** - Changes to `api.py` require restart
+
+#### "ImportError" or "Circular Import"
+
+**Problem**: Getting import errors when Django starts
+
+**Solution**: Use local imports in endpoint functions:
+```python
+# myapp/api.py
+from ninja import Router
+
+router = Router(tags=["My App"])
+
+@router.get("/items/")
+def list_items(request):
+    from .models import MyModel  # ← Import inside function
+    return {"items": list(MyModel.objects.values())}
+```
+
+#### "Router has no tags warning"
+
+**Problem**: System check warns about missing tags
+
+**Solution**: Add tags to your router:
+```python
+router = Router(tags=["My App"])  # ← Helps organize OpenAPI docs
+```
+
+#### "APIToken table does not exist"
+
+**Problem**: Database error on startup
+
+**Solution**: Run migrations:
+```bash
+python manage.py migrate django_directory_api
+```
+
+### Debug Output
+
+The package prints discovery information on startup:
+```
+[django-directory-api] Auto-discovered and registered 3 API routers
+```
+
+If you see `0 API routers`, check:
+- INSTALLED_APPS ordering
+- Router export names (`router` or `routers`)
+- Syntax errors in api.py files
 
 ## Development
 

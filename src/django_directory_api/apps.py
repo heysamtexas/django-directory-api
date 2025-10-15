@@ -23,6 +23,9 @@ class DjangoDirectoryApiConfig(AppConfig):
 
         Auto-discovers api.py files in all installed apps and registers their routers.
         """
+        # Import checks to register them with Django's check framework
+        from django_directory_api import checks  # noqa: F401
+
         # Only initialize once (ready() can be called multiple times)
         import django_directory_api
 
