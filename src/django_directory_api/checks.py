@@ -64,11 +64,11 @@ def check_installed_apps_order(app_configs, **kwargs):
 
 
 @register(Tags.database)
-def check_apitoken_table_exists(app_configs, **kwargs):
-    """Check that APIToken migrations have been run.
+def check_apitoken_migrations(app_configs, **kwargs):
+    """Check that django_directory_api migrations have been applied.
 
-    The APIToken model is required for authentication. This check ensures
-    the database table exists.
+    This check verifies that migrations are up-to-date without querying
+    the database, which would block the migrate command itself.
     """
     errors = []
 
@@ -77,16 +77,24 @@ def check_apitoken_table_exists(app_configs, **kwargs):
         return errors
 
     try:
-        from django_directory_api.models import APIToken
+        from django.db import DEFAULT_DB_ALIAS, connections
+        from django.db.migrations.executor import MigrationExecutor
 
-        # Try to query the model - this will fail if table doesn't exist
-        APIToken.objects.exists()
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "no such table" in error_msg or "relation" in error_msg or "does not exist" in error_msg:
+        # Get migration executor for default database
+        executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
+
+        # Get migration plan - if it's not empty, there are unapplied migrations
+        targets = executor.loader.graph.leaf_nodes()
+        plan = executor.migration_plan(targets)
+
+        # Check if any migrations are for django_directory_api
+        unapplied_migrations = [migration for migration, _backwards in plan if migration[0] == "django_directory_api"]
+
+        if unapplied_migrations:
+            migration_names = ", ".join([f"{app}.{name}" for app, name in unapplied_migrations])
             errors.append(
                 Error(
-                    "APIToken database table does not exist.",
+                    f"django_directory_api has unapplied migrations: {migration_names}",
                     hint=(
                         "Run migrations to create the APIToken table:\n"
                         "  python manage.py migrate django_directory_api"
@@ -94,6 +102,11 @@ def check_apitoken_table_exists(app_configs, **kwargs):
                     id="django_directory_api.E001",
                 )
             )
+
+    except Exception:
+        # If we can't check migrations (e.g., database not configured),
+        # don't block - let Django handle that error
+        pass
 
     return errors
 
