@@ -1,6 +1,6 @@
 [project]
 name = "django-directory-api"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reusable Django REST API framework with auto-discovery and bearer token authentication"
 authors = [
     { name = "Directory Platform Team" }

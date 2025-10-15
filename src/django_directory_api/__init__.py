@@ -12,5 +12,5 @@ API instance will be created when Django apps are ready (in apps.py).
 # API instance will be created during Django startup
 api = None
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = ["api", "__version__"]
